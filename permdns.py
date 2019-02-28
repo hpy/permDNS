@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # released at BSides Canberra by @infosec_au and @nnwakelam
 # rewritten by happy3n1gma
-# gotta <3 silvio
+# still sending the <3 to silvio
 
 import argparse, time, requests, itertools, threading, time, datetime, tldextract, logging, re, os, dns.resolver
 from threading import Lock
@@ -376,7 +376,7 @@ class permDNS(object):
 def scan_domains(thread):
     ''' Check domain for dns record '''
     resolver = dns.resolver.Resolver()
-
+    
     # Use custom dns server
     if(thread.parent.args.dnsserver is not None): 
         resolver.nameservers = [r.strip() for r in thread.parent.args.dnsserver.split(",")]
@@ -389,39 +389,38 @@ def scan_domains(thread):
 
         final_hostname = target.strip()
         
-        # check if an A record first - if so then we look at CNAME, else move on
-
+        
         result = []
         result.append(target)
+
+        # Check if an A record exists
+        try:
+            A = resolver.query(final_hostname, "A")
+            if A:
+                result = []
+                result.append(final_hostname)
+                result.append(str(A[0]))
+        except:
+            # not found then move onto next domain
+            continue
+
+        # If we found a record, then lets try and find a CNAME record
         try:
             for rdata in resolver.query(final_hostname, 'CNAME'):
                 result.append(rdata.target)
         except:
             pass
-
-
-
-        if len(result) <= 1:
+        
+        # check if we found an aws domain
+        ext = tldextract.extract(str(result[1]))
+        if ext.domain == "amazonaws":
             try:
-                A = resolver.query(final_hostname, "A")
-                if len(A) > 0:
-                    result = []
-                    result.append(final_hostname)
-                    result.append(str(A[0]))
+                for rdata in resolver.query(result[1], 'CNAME'):
+                    result.append(rdata.target)
             except:
                 pass
-        
-        if len(result) > 1: 
-            # check if we found an aws domain
-            ext = tldextract.extract(str(result[1]))
-            if ext.domain == "amazonaws":
-                try:
-                    for rdata in resolver.query(result[1], 'CNAME'):
-                        result.append(rdata.target)
-                except:
-                    pass
 
-            thread.update_results(result)
+        thread.update_results(result)
 
 
 
